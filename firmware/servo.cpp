@@ -230,6 +230,8 @@ bool CServoDriver::move_to_pwm(int pwm_value, int timeout_ms, bool enforce_limit
     OneShot servo_timer;
 
     // start moving the servo - converting the PWM value into a position
+    //CHOP U[ THE PWM_VALUE SO THAT IT MOVES IN INCREMENTS
+    //MAKE IT 10 FOR NOW THEN BEFORE COMMITTING MAKE IT ADJUSTABLE
     bool is_move_started = start_move_to_pwm(pwm_value, enforce_limit);
 
     // if servo hasn't started to move, return false
@@ -308,9 +310,35 @@ bool CServoDriver::start_move_to_pwm(int pwm_value, bool enforce_limit)
 
     // Perform current logging
     CurLogger.execute();
+    // Encapsulate line 315 to 342 in a for loop, adust the pwm_value so that it goes by increment
+    
+    int target_pwm_value = (MAX_VALID_PWM - pwm_value);
+    int increment = 1;
+    current_pwm_value = 0;
+//++++++++++++++++++++++OPTION 1+++++++++++++++++++++++++
+    while (current_pwm_value < target_pwm_value) {
+    current_pwm_value += increment;
+        if (current_pwm_value > target_pwm_value) {
+            pwm.setPWM(0, 0, target_pwm_value);
+            break;
+        }else{
+            pwm.setPWM(0,0,current_pwm_value);
+        }
+    }
+//+++++++++++++++++++++OPTION 2+++++++++++++++++++++++++++
 
-    // set PWM value for the servo to move
-    pwm.setPWM(0, 0, MAX_VALID_PWM - pwm_value);
+uint16_t target_pwm_value = /* Set your target PWM value here */;
+
+// Create a loop to gradually reach the target PWM value
+for (uint16_t current_pwm = 4096; current_pwm >= target_pwm_value; current_pwm -= increment) {
+  pwm.setPWM(0, 0, current_pwm);
+  #ifdef ESP8266
+  yield();  // take a breather, required for ESP8266
+#endif
+}
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+    //pwm.setPWM(0, 0, MAX_VALID_PWM - pwm_value);
 
     // start the oneshot timer, it shouldn't take more than 1 second to start a move
     servo_timer.start(1000);
@@ -348,13 +376,22 @@ bool CServoDriver::start_move_to_pwm(int pwm_value, bool enforce_limit)
 
 //=========================================================================================================
 // move_to_index() - moves the servo to an exact position based on the index
+// index parameter is the desired position
+//ee.servo_max - ee.servo_min; are the max and min of the servo's position
+// move_to_pwm(int pwm_value, int timeout_ms, bool enforce_limit)
+//timeout_ms is the time alloted for moving the hardware
 //=========================================================================================================
 bool CServoDriver::move_to_index(int index)
 {   
     int range = ee.servo_max - ee.servo_min;
-    
+    //ADD A PARAMETER TO MOVE_TO_INDEX ADD A NUMBER OF INCREMENTS
+    //we can multipy the index by 5 to move in increments of 5
+    //MAKE THE MACHINE STOP AT EACH INDEX THAT MOVES TO WHAT IS NOT THE FINAL INDEX
+    //CREATE A LOOP THAT GOES THROUGH 1 AT A TIME THAT 
+    index = index * 5;              `````````````````````
     int pwm_value = index * range / get_max_index() + ee.servo_min;
-
+    
+    //This is the actual function that makes the servo run
     return move_to_pwm(pwm_value, 4000, true);
 }
 //=========================================================================================================
